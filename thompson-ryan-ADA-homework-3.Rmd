@@ -133,14 +133,26 @@ cia_point <- predict(a,
 )
 cia_point
 
+pia_point <- predict(a,
+                     newdata = data.frame(Brain_Size_Species_Mean = 750),
+                     interval = "prediction", level = 1 - alpha
+)
+pia_point
+
 cib_point <- predict(b,
                      newdata = data.frame(log_Brain_Size_Species_Mean = log(750)),
                interval = "confidence", level = 1 - alpha
 )
 exp(cib_point)
+
+pib_point <- predict(b,
+                     newdata = data.frame(log_Brain_Size_Species_Mean = log(750)),
+                     interval = "confidence", level = 1 - alpha
+)
+exp(cib_point)
 ```
 
-##Looking at the two models I thing that the log transformed model is a better fit for the data because 
+##Looking at the two models I thing that the log-log transformed model is a better fit for the data because the fit line has smaller residuals and the points are distributed more linearly. 
 
 # Challenge 2
 
