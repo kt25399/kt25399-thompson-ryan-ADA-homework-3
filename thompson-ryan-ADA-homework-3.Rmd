@@ -9,87 +9,160 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Challenge 1 R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
+```{r packages, include = FALSE}
 library(broom)
 library(tidyverse)
 library(car)
 library(infer)
+library(gridExtra)
+```
+
+# Challenge 1 
+
+## Uploading Kamilar and Cooper.
+```{r}
 
 ## Challenge 1
 
 f <-"https://raw.githubusercontent.com/difiore/ADA-datasets/master/KamilarAndCooperData.csv"
 d <- read.csv(f)
 head(d)
+```
+
+## Creating simple linear regression model for MaxLongevity_m and Brain_Size_Species_Mean.
+
+``` {r}
+d <- d %>%  mutate(
+  log_MaxLongevity_m = log(MaxLongevity_m),
+  log_Brain_Size_Species_Mean = log(Brain_Size_Species_Mean)
+)
 
 a <- lm(MaxLongevity_m ~ Brain_Size_Species_Mean, data = d)
-b <- lm(log(MaxLongevity_m) ~ log(Brain_Size_Species_Mean), data = d)
+b <- lm(log_MaxLongevity_m ~ log_Brain_Size_Species_Mean, data = d)
 
 tidy(a)
 summary(a)
 
-glance(b)
+tidy(b)
 summary(b)
+```
 
+##  Scatterplots with superimposed lines, fitted model equation included.
+
+```{r}
+p1 <- ggplot(d, aes(y = MaxLongevity_m, x = Brain_Size_Species_Mean)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE) +
+  annotate("text", label = "Y = 249.0 + 1.2 * X", size = 4, x = 100, y = 800)
+
+p2 <- ggplot(d, aes(y = log_MaxLongevity_m, x = log_Brain_Size_Species_Mean)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y  ~ x, se = FALSE) +
+  annotate("text", label = "log(Y) = 4.9 + 0.2 * log(X)", size = 4, x = 2.3, y = 6.5)
+
+grid.arrange(p1, p2, nrow = 1)
+```
+
+## β1 does not equal 0 in either model (1.2 and 0.2) so H0 can be rejected in both cases. 
+## Calculating 90% confidence intervals.
+ 
+```{r}
 alpha = 0.1
 
 (CIA <- tidy(a, conf.int = TRUE, conf.level = 1 - alpha))
 (CIB <- tidy(b, conf.int = TRUE, conf.level = 1 - alpha))
+```
 
-CIA$conf.low[1]
+## Adding Confidence and prediction interval bands to plot.
 
-ggplot(d, aes(y = MaxLongevity_m, x = Brain_Size_Species_Mean)) +
+``` {r}
+cia <- predict(a, newdata = data.frame(Brain_Size_Species_Mean = d$Brain_Size_Species_Mean), 
+               interval = "confidence", level = 1 - alpha)
+cia <- data.frame(cia)
+cia <- cbind(d$Brain_Size_Species_Mean, cia)
+names(cia) <- c("Brain_Size_Species_Mean", "c.fit", "c.lwr", "c.upr")
+pia <- predict(a, newdata = data.frame(Brain_Size_Species_Mean = d$Brain_Size_Species_Mean), 
+               interval = "prediction", level = 1 - alpha)
+pia <- data.frame(pia)
+pia <- cbind(d$Brain_Size_Species_Mean, pia)
+names(pia) <- c("Brain_Size_Species_Mean", "p.fit", "p.lwr", "p.upr")
+
+cib <- predict(b, newdata = data.frame(log_Brain_Size_Species_Mean = d$log_Brain_Size_Species_Mean), 
+               interval = "confidence", leve = 1 - alpha)
+cib <- data.frame(cib)
+cib <- cbind(d$log_Brain_Size_Species_Mean, cib)
+names(cib) <- c("log_Brain_Size_Species_Mean", "c.fit", "c.lwr", "c.upr")
+pib <- predict(b, newdata = data.frame(log_Brain_Size_Species_Mean = d$log_Brain_Size_Species_Mean), 
+               interval = "prediction", level = 1 - alpha)
+pib <- data.frame(pib)
+pib <- cbind(d$log_Brain_Size_Species_Mean, pib)
+names(pib) <- c("log_Brain_Size_Species_Mean", "p.fit", "p.lwr", "p.upr")
+
+
+p1 <- ggplot(d, aes(y = MaxLongevity_m, x = Brain_Size_Species_Mean)) +
   geom_point() +
-  geom_smooth(method = "lm", formula = y ~ x) +
   annotate("text", label = "Y = 249.0 + 1.2 * X", size = 4, x = 100, y = 800) +
-  geom_abline(intercept = CIA$conf.low[1], slope = CIA$conf.low[2], color = "Red") +
-  geom_abline(intercept = CIA$conf.high[1], slope = CIA$conf.high[2], color = "Purple") 
+  geom_line(data = cia, aes(x = Brain_Size_Species_Mean, y = c.fit, color = "black")) +
+  geom_line(data = cia, aes(x = Brain_Size_Species_Mean, y = c.lwr, color = "red")) +
+  geom_line(data = cia, aes(x = Brain_Size_Species_Mean, y = c.upr, color = "red")) +
+  geom_line(data = pia, aes(x = Brain_Size_Species_Mean, y = p.lwr, color = "purple")) +
+  geom_line(data = pia, aes(x = Brain_Size_Species_Mean, y = p.upr, color = "purple")) +
+  scale_color_hue(labels = c("Fit", "CI", "PI"))
+p1
 
-ggplot(d, aes(y = log(MaxLongevity_m), x = log(Brain_Size_Species_Mean))) +
+p2 <- ggplot(d, aes(y = log_MaxLongevity_m, x = log_Brain_Size_Species_Mean)) +
   geom_point() +
-  geom_smooth(method = "lm", formula = y  ~ x) +
-  annotate("text", label = "log(Y) = 4.9 + 0.2 * log(X)", size = 4, x = 2.3, y = 6.5) +
-  geom_abline(intercept = CIB$conf.low[1], slope = CIB$conf.low[2], color = "Red") +
-  geom_abline(intercept = CIB$conf.high[1], slope = CIB$conf.high[2], color = "Purple")
-  
-cia <- predict(a,
-              newdata = data.frame(Brain_Size_Species_Mean = 750),
-              interval = "confidence", level = 1 - alpha
+    annotate("text", label = "log(Y) = 4.9 + 0.2 * log(X)", size = 4, x = 2.3, y = 6.5) +
+  geom_line(data = cib, aes(x = log_Brain_Size_Species_Mean, y = c.fit, color = "black")) +
+  geom_line(data = cib, aes(x = log_Brain_Size_Species_Mean, y = c.lwr, color = "red")) +
+  geom_line(data = cib, aes(x = log_Brain_Size_Species_Mean, y = c.upr, color = "red")) +
+  geom_line(data = pib, aes(x = log_Brain_Size_Species_Mean, y = p.lwr, color = "purple")) +
+  geom_line(data = pib, aes(x = log_Brain_Size_Species_Mean, y = p.upr, color = "purple")) +
+  scale_color_hue(labels = c("Fit", "CI", "PI"))
+p2
+
+grid.arrange(p1, p2, nrow = 1)
+```
+
+## Point estimate and 90% prediction interval of longevity for a species whose brain weight is 750g. This estimate should not be trusted because the observed brain weight of the species is outside of the range of values within the model.
+
+``` {r}
+cia_point <- predict(a,
+               newdata = data.frame(Brain_Size_Species_Mean = 750),
+               interval = "confidence", level = 1 - alpha
 )
-cia
+cia_point
 
-cib <- predict(b,
-                newdata = data.frame(Brain_Size_Species_Mean = log(750)),
-                interval = "confidence", level = 1 - alpha
+cib_point <- predict(b,
+                     newdata = data.frame(log_Brain_Size_Species_Mean = log(750)),
+               interval = "confidence", level = 1 - alpha
 )
-cib
-(10^(cib))
+exp(cib_point)
+```
 
+##Looking at the two models I thing that the log transformed model is a better fit for the data because 
 
-## Challenge 2
+# Challenge 2
+
+## Running linear regression of log(HomeRange_km2) and log(Body_mass_female_mean)
+
+``` {r}
+
 d <- d %>% 
   mutate(log_HomeRange_km2 = log(HomeRange_km2),
          log_Body_mass_female_mean = log(Body_mass_female_mean)
   )
 
-c <- lm(log(HomeRange_km2) ~ log(Body_mass_female_mean), data = d)
+c <- lm(log_HomeRange_km2 ~ log_Body_mass_female_mean, data = d)
 c
+```
 
-ggplot(d, aes(y = log_HomeRange_km2, x = log_Body_mass_female_mean)) +
-  geom_point() +
-  geom_smooth(method = "lm", formula = y ~ x)
+## Bootstrap of 1000 samples from dataset
 
+```{r}
 bootstrapped <- d %>% 
   specify(log_HomeRange_km2 ~ log_Body_mass_female_mean) %>% 
   generate(reps = 1000, type = "bootstrap")
-
-
-lm(log_HomeRange_km2 ~ log_Body_mass_female_mean, bootstrapped)$coefficients[1]
 
 slope <- vector()
 intercept <- vector()
@@ -104,19 +177,28 @@ for(i in unique(bootstrapped$replicate)) {
 bootstrapped_lm <- tibble(
   slope = slope, 
   intercept = intercept)
+```
 
+## Histograms for β0 and β1
+
+```{r}
 ggplot(bootstrapped_lm, aes(x = slope)) +
   geom_histogram()
 ggplot(bootstrapped_lm, aes(x = intercept)) + 
   geom_histogram()
+```
 
+## Estimates for β coefficients
 mean(bootstrapped_lm$slope)
 sd(bootstrapped_lm$slope)
 
 mean(bootstrapped_lm$intercept)
 sd(bootstrapped_lm$intercept)
+```
 
-## challenge 3
+# Challenge 3
+
+``` {r}
 boot_lm <- function(d, model, conf.level = 0.95, reps = 1000) {
   x <- d %>% 
     specify(model) %>% 
