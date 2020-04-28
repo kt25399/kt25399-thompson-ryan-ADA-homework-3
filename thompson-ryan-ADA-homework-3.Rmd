@@ -236,9 +236,18 @@ bs_ci_intercept
 ## The bootstrap method found that SE = `r bs_ci_slope$std.error` and CI = `r bs_ci_slope$perm.lower` - `r bs_ci_slope$perm.upper` for β1, and SE = `r bs_ci_intercept$std.error` and CI = `r bs_ci_intercept$perm.lower` - `r bs_ci_intercept$perm.upper` for β0 
 
 # Challenge 3
-
+## Creating the function
 ``` {r}
 boot_lm <- function(d, model, conf.level = 0.95, reps = 1000) {
+  d <- d %>% mutate(
+      logHR = log(HomeRange_km2),
+      logBM = log(Body_mass_female_mean),
+      logDL = log(DayLength_km)
+  )
+  model <- as.formula(model)
+  
+  c <- lm(model, data = d)
+  
   x <- d %>% 
     specify(model) %>% 
     generate(reps = reps, type = "bootstrap")
@@ -264,21 +273,40 @@ boot_lm <- function(d, model, conf.level = 0.95, reps = 1000) {
   p_upper <- 1 - (alpha / 2)
   degrees_of_freedom <- nrow(bootstrapped_lm) - 2
   critical_value <- qt(p_upper, df = degrees_of_freedom)
-
-  bs_ci_slope <- bootstrapped_lm %>% 
-  summarize(
-    beta1.boot = mean(slope),
-    beta1.std.error.boot = sd(slope),
-    beta1.perm.lower = quantile(slope, p_lower),
-    beta1.perm.upper = quantile(slope, p_upper),
-    beta0.boot = mean(intercept),
-    beta1.std.error.boot = sd(intercept),
-    beta0.perm.lower = quantile(intercept, p_lower),
-    beta0.perm.upper = quantile(intercept, p_upper),
-    
+  
+  bootstrapped_lm <- bootstrapped_lm %>% 
+    summarize(
+      model = "boot",
+      beta1 = mean(slope), 
+      beta1.std.error = sd(slope),
+      beta1.ci.lower = quantile(slope, p_lower),
+      beta1.ci.upper = quantile(slope, p_upper),
+      beta0 = mean(intercept),
+      beta0.std.error = sd(intercept),
+      beta0.ci.lower = quantile(intercept, p_lower),
+      beta0.ci.upper = quantile(intercept, p_upper),
+      
+    )
+  lm_model <- tibble(model = "lm()",
+                     beta1 = c$coefficients[2],
+                     beta1.std.error = tidy(c)$std.error[2],
+                     beta1.ci.lower =  tidy(c, conf.int = TRUE, conf.level = conf.level)$conf.low[2],
+                     beta1.ci.upper =  tidy(c, conf.int = TRUE, conf.level = conf.level)$conf.high[2],
+                     beta0 = c$coefficients[1],
+                     beta0.std.error = tidy(c)$std.error[1],
+                     beta0.ci.lower = tidy(c, conf.int = TRUE, conf.level = conf.level)$conf.low[1],
+                     beta0.ci.upper = tidy(c, conf.int = TRUE, conf.level = conf.level)$conf.high[1]
   )
-  bs_ci_slope
+  bootstrapped_lm <- rbind(lm_model, bootstrapped_lm)
+  bootstrapped_lm
 }
+```
 
-boot_lm(d = d, model = HomeRange_km2 ~ Body_mass_female_mean)
+## Running the function on: 
+###-log(HomeRange_km2) ~ log(Body_mass_female_mean)
+###-log(DayLength_km) ~ log(Body_mass_female_mean)
+###-log(HomeRange_km2) ~ log(Body_mass_female_mean) + MeanGroupSize
+```{r}
+boot_lm(d = d, model = "logHR ~ logBM")
+boot_lm(d = d, model = "logDL ~ logBM")
 ```
