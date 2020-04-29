@@ -49,7 +49,7 @@ summary(b)
 
 ##  Scatterplots with superimposed lines, fitted model equation included.
 
-```{r}
+```{r warning = FALSE}
 p1 <- ggplot(d, aes(y = MaxLongevity_m, x = Brain_Size_Species_Mean)) +
   geom_point() +
   geom_smooth(method = "lm", formula = y ~ x, se = FALSE) +
@@ -75,7 +75,7 @@ alpha = 0.1
 
 ## Adding Confidence and prediction interval bands to plot.
 
-``` {r}
+``` {r warning = FALSE}
 cia <- predict(a, newdata = data.frame(Brain_Size_Species_Mean = d$Brain_Size_Species_Mean), 
                interval = "confidence", level = 1 - alpha)
 cia <- data.frame(cia)
@@ -101,7 +101,7 @@ names(pib) <- c("log_Brain_Size_Species_Mean", "p.fit", "p.lwr", "p.upr")
 
 p1 <- ggplot(d, aes(y = MaxLongevity_m, x = Brain_Size_Species_Mean)) +
   geom_point() +
-  annotate("text", label = "Y = 249.0 + 1.2 * X", size = 4, x = 100, y = 800) +
+  annotate("text", label = "Y = 249.0 + 1.2 * X", size = 4, x = 200, y = 900) +
   geom_line(data = cia, aes(x = Brain_Size_Species_Mean, y = c.fit, color = "black")) +
   geom_line(data = cia, aes(x = Brain_Size_Species_Mean, y = c.lwr, color = "red")) +
   geom_line(data = cia, aes(x = Brain_Size_Species_Mean, y = c.upr, color = "red")) +
@@ -111,7 +111,7 @@ p1 <- ggplot(d, aes(y = MaxLongevity_m, x = Brain_Size_Species_Mean)) +
 
 p2 <- ggplot(d, aes(y = log_MaxLongevity_m, x = log_Brain_Size_Species_Mean)) +
   geom_point() +
-    annotate("text", label = "log(Y) = 4.9 + 0.2 * log(X)", size = 4, x = 2.3, y = 6.5) +
+    annotate("text", label = "log(Y) = 4.9 + 0.2 * log(X)", size = 4, x = 4, y = 6.5) +
   geom_line(data = cib, aes(x = log_Brain_Size_Species_Mean, y = c.fit, color = "black")) +
   geom_line(data = cib, aes(x = log_Brain_Size_Species_Mean, y = c.lwr, color = "red")) +
   geom_line(data = cib, aes(x = log_Brain_Size_Species_Mean, y = c.upr, color = "red")) +
@@ -125,7 +125,7 @@ grid.arrange(p1, p2, nrow = 1)
 ## Point estimate and 90% prediction interval of longevity for a species whose brain weight is 750g. 
 ## This estimate should not be trusted because the observed brain weight of the species is outside of the range of values within the model.
 
-``` {r}
+``` {r warning = FALSE}
 cia_point <- predict(a,
                newdata = data.frame(Brain_Size_Species_Mean = 750),
                interval = "confidence", level = 1 - alpha
@@ -151,7 +151,7 @@ pib_point <- predict(b,
 exp(cib_point)
 ```
 
-## Looking at the two models I thing that the log-log transformed model is a better fit for the data because the fit line has smaller residuals and the points are distributed more linearly. 
+## Looking at the two models, the log-log transformed model is a better fit for the data because the fit line has smaller residuals and the points are distributed more linearly. 
 
 # Challenge 2
 
@@ -170,7 +170,7 @@ c
 
 ## Bootstrap of 1000 samples from dataset
 
-```{r}
+```{r warning = FALSE}
 bootstrapped <- d %>% 
   specify(log_HomeRange_km2 ~ log_Body_mass_female_mean) %>% 
   generate(reps = 1000, type = "bootstrap")
@@ -303,10 +303,33 @@ boot_lm <- function(d, model, conf.level = 0.95, reps = 1000) {
 ```
 
 ## Running the function on: 
-###-log(HomeRange_km2) ~ log(Body_mass_female_mean)
-###-log(DayLength_km) ~ log(Body_mass_female_mean)
-###-log(HomeRange_km2) ~ log(Body_mass_female_mean) + MeanGroupSize
-```{r}
+### log(HomeRange_km2) ~ log(Body_mass_female_mean)
+### log(DayLength_km) ~ log(Body_mass_female_mean)
+### log(HomeRange_km2) ~ log(Body_mass_female_mean) + MeanGroupSize
+```{r warning = FALSE}
 boot_lm(d = d, model = "logHR ~ logBM")
 boot_lm(d = d, model = "logDL ~ logBM")
+```
+
+#Extra Credit
+
+##Running loop for 10-200 by 10 rep bootsrap
+```{r warning = FALSE}
+a <- tibble()
+
+for (i in seq(10, 200, by =10)) {
+  r <- boot_lm(d = d, model = "logHR ~ logBM", reps = i)
+  a <- rbind(a, c(i, r[[2]][[2]],r[[4]][[2]], r[[5]][[2]], r[[2]][[1]]))
+}
+names(a) <- c("reps", "beta1", "CI_low", "CI_high", "actual_beta1")
+```
+
+## Plotting the result!
+
+```{r}
+ggplot(data = a, aes(x = reps)) +
+  geom_line(data = a, aes(x = reps, y = beta1, color = "black"), color = "black") +
+  geom_line(data = a, aes(x = reps, y = CI_low, color = "blue"), color = "blue") +
+  geom_line(data = a, aes(x = reps, y = CI_high, color = "blue"), color = "blue") +
+  geom_line(data = a, aes(x = reps, y = actual_beta1, color = "red"), color = "red")
 ```
