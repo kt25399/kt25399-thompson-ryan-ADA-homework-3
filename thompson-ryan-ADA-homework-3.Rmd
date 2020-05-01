@@ -171,21 +171,17 @@ c
 ## Bootstrap of 1000 samples from dataset
 
 ```{r warning = FALSE}
-bootstrapped <- d %>% 
-  specify(log_HomeRange_km2 ~ log_Body_mass_female_mean) %>% 
-  generate(reps = 1000, type = "bootstrap")
-
+e <- list()
 slope <- vector()
 intercept <- vector()
-
-for(i in unique(bootstrapped$replicate)) {
-  x <- filter(bootstrapped, replicate == i)
-  y <- lm(log_HomeRange_km2 ~ log_Body_mass_female_mean, data = x)
-  slope[[i]] <- y$coefficients[2]
-  intercept[[i]] <- y$coefficients[1]
+for (i in 1:1000) {
+  e[[i]] <- sample_n(d, size = nrow(d), replace = TRUE)
+  f <- lm(log_HomeRange_km2 ~ log_Body_mass_female_mean, data = e[[i]])
+  slope[[i]] <- f$coefficients[2]
+  intercept[[i]] <- f$coefficients[1]
 }
 
-bootstrapped_lm <- tibble(
+new <- tibble(
   slope = slope, 
   intercept = intercept)
 ```
@@ -193,9 +189,9 @@ bootstrapped_lm <- tibble(
 ## Histograms for β0 and β1
 
 ```{r}
-ggplot(bootstrapped_lm, aes(x = slope)) +
+ggplot(new, aes(x = slope)) +
   geom_histogram()
-ggplot(bootstrapped_lm, aes(x = intercept)) + 
+ggplot(new, aes(x = intercept)) + 
   geom_histogram()
 ```
 
@@ -206,10 +202,10 @@ alpha <- 0.05
 confidence_level <- 1 - alpha
 p_lower <- alpha / 2
 p_upper <- 1 - (alpha / 2)
-degrees_of_freedom <- nrow(bootstrapped_lm) - 2
+degrees_of_freedom <- nrow(new) - 2
 critical_value <- qt(p_upper, df = degrees_of_freedom)
 
-bs_ci_slope <- bootstrapped_lm %>% 
+bs_ci_slope <- new %>% 
   summarize(
     estimate = mean(slope),
     std.error = sd(slope),
@@ -220,7 +216,7 @@ bs_ci_slope <- bootstrapped_lm %>%
   )
 bs_ci_slope
 
-bs_ci_intercept <- bootstrapped_lm %>% 
+bs_ci_intercept <- new %>% 
   summarize(
     estimate = mean(intercept),
     std.error = sd(intercept),
@@ -248,33 +244,28 @@ boot_lm <- function(d, model, conf.level = 0.95, reps = 1000) {
   
   c <- lm(model, data = d)
   
-  x <- d %>% 
-    specify(model) %>% 
-    generate(reps = reps, type = "bootstrap")
-  
+  z <- list()
   slope <- vector()
   intercept <- vector()
-  
-  for(i in unique(x$replicate)) {
-    z <- filter(x, replicate == i)
-    y <- lm(model, data = z)
-    slope[[i]] <- y$coefficients[2]
-    intercept[[i]] <- y$coefficients[1]
+  x <- for (i in 1:reps) {
+    z[[i]] <- sample_n(d, size = nrow(d), replace = TRUE)
+    e <- lm(model, data = z[[i]])
+    slope[[i]] <- e$coefficients[2]
+    intercept[[i]] <- e$coefficients[1]
   }
   
-  bootstrapped_lm <- tibble(
+  new <- tibble(
     slope = slope, 
     intercept = intercept)
-  bootstrapped_lm
   
   confidence_level <- conf.level
   alpha <- 1 - conf.level
   p_lower <- alpha / 2
   p_upper <- 1 - (alpha / 2)
-  degrees_of_freedom <- nrow(bootstrapped_lm) - 2
+  degrees_of_freedom <- nrow(new) - 2
   critical_value <- qt(p_upper, df = degrees_of_freedom)
   
-  bootstrapped_lm <- bootstrapped_lm %>% 
+  new <- new %>% 
     summarize(
       model = "boot",
       beta1 = mean(slope), 
@@ -297,8 +288,8 @@ boot_lm <- function(d, model, conf.level = 0.95, reps = 1000) {
                      beta0.ci.lower = tidy(c, conf.int = TRUE, conf.level = conf.level)$conf.low[1],
                      beta0.ci.upper = tidy(c, conf.int = TRUE, conf.level = conf.level)$conf.high[1]
   )
-  bootstrapped_lm <- rbind(lm_model, bootstrapped_lm)
-  bootstrapped_lm
+  new <- rbind(lm_model, new)
+  new
 }
 ```
 
@@ -309,6 +300,7 @@ boot_lm <- function(d, model, conf.level = 0.95, reps = 1000) {
 ```{r warning = FALSE}
 boot_lm(d = d, model = "logHR ~ logBM")
 boot_lm(d = d, model = "logDL ~ logBM")
+boot_lm(d = d, model = "logHR ~ logBM + MeanGroupSize")
 ```
 
 #Extra Credit
